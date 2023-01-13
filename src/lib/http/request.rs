@@ -11,6 +11,7 @@ pub struct Request {
     pub body: Vec<u8>,
     pub method: Method,
     pub url: Url,
+    pub version: String,
 }
 
 #[derive(Debug, Default)]
@@ -144,6 +145,7 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
         url,
         body,
         method: method.unwrap_or_default(),
+        version: version.unwrap_or_default().to_string(),
     };
 
     debug!("done reading request. url: {}. req: {:?}", req.url, req);
@@ -180,19 +182,5 @@ impl std::str::FromStr for Method {
             "TRACE" => TRACE,
             other => bail!("unknown HTTP method: {}", other),
         })
-    }
-}
-
-mod test {
-    use super::*;
-
-    #[test]
-    async fn test_boring_http_get() {
-        let mut input = r#"GET / HTTP/1.1
-Host: 127.0.0.1:8080
-User-Agent: curl/7.83.1
-Accept: */*
-
-"#;
     }
 }

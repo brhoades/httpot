@@ -68,7 +68,7 @@ async fn process_socket(s: TcpStream) -> Result<()> {
     info!("get socket start...");
     loop {
         r.get_ref().readable().await?;
-        let req = httpot::http::parse_request(&mut r).await;
+        let req = httpot::http::request::parse_request(&mut r).await;
         info!("req: {:?}", req);
 
         req?;
