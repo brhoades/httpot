@@ -3,4 +3,6 @@ pub mod prelude {
     pub use log::{debug, error, info, trace, warn};
 }
 
+pub mod http;
+// pub mod test;
 pub mod util;
