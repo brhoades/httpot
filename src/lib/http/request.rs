@@ -145,14 +145,14 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
         url,
         body,
         method: method.unwrap_or_default(),
-        version: version.unwrap_or_default().to_string(),
+        version: version.unwrap_or_default().trim().to_string(),
     };
 
     debug!("done reading request. url: {}. req: {:?}", req.url, req);
     Ok(req)
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub enum Method {
     GET,
     #[default]
@@ -182,5 +182,35 @@ impl std::str::FromStr for Method {
             "TRACE" => TRACE,
             other => bail!("unknown HTTP method: {}", other),
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use tokio::io::BufReader;
+    use url::Host;
+
+    #[tokio::test]
+    async fn test_basic_get_request_parse() {
+        let input = r#"GET / HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: curl/7.83.1
+Foo: Bar
+Biz: Baz
+Cookie: asdf=123, fghj=4567, session=someid
+Accept: */*
+
+"#;
+        let mut r = BufReader::new(input.as_bytes());
+
+        let req = parse_request(&mut r).await.unwrap();
+
+        assert_eq!(Method::GET, req.method);
+        assert_eq!("/", req.url.path());
+        assert_eq!("127.0.0.1".parse().ok().map(Host::Ipv4), req.url.host());
+        assert_eq!(8080, req.url.port().unwrap_or_default());
+        assert_eq!("HTTP/1.1", req.version);
+        assert_eq!(0, req.body.len());
     }
 }
