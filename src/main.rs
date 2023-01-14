@@ -47,17 +47,21 @@ async fn main() -> Result<()> {
 
 fn init_logging(opt: &Opt) {
     let mut builder = pretty_env_logger::formatted_timed_builder();
-    if std::env::var("RUST_LOG").is_err() && opt.log_level.is_some() {
-        builder.filter_level(opt.log_level.unwrap())
+    let level = if let Some(lvl) = opt.log_level {
+        lvl
+    } else if let Ok(lvl) = std::env::var("RUST_LOG") {
+        lvl.parse().unwrap()
     } else {
-        builder.filter_level(LevelFilter::Info)
+        LevelFilter::Info
     };
+
+    builder.filter_level(level);
 
     let res = builder.target(opt.log_target).try_init();
 
     match res {
         Err(e) => println!("failed to init {}", e),
-        Ok(_) => info!("logger initialized"),
+        Ok(_) => warn!("logger initialized at level={}", level),
     }
 }
 
@@ -69,7 +73,7 @@ async fn process_socket(s: TcpStream) -> Result<()> {
     loop {
         r.get_ref().readable().await?;
         let req = httpot::http::request::parse_request(&mut r).await;
-        info!("req: {:?}", req);
+        trace!("req: {:#?}", req);
 
         req?;
 
