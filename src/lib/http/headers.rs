@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 /// Headers are key-value with multiple values. Adding a new header
 /// does not overwrite existing values, it only appends.
@@ -8,6 +8,24 @@ pub struct Headers(HashMap<String, Vec<String>>);
 impl Headers {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn entry(&mut self, key: String) -> Entry<String, Vec<String>> {
+        self.0.entry(key)
+    }
+
+    pub fn get(&self, key: &str) -> Option<&Vec<String>> {
+        self.0.get(key)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut Vec<String>> {
+        self.0.get_mut(key)
+    }
+
+    #[allow(dead_code)]
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 
     /// renders the HTTP request/response format header listing

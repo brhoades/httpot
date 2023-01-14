@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use crate::http::headers::Headers;
-use crate::prelude::*;
 
 #[derive(Default, Builder, Debug)]
 #[builder(setter(into))]

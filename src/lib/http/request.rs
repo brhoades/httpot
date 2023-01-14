@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::http::headers::Headers;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use url::Url;
 
@@ -6,7 +6,7 @@ use crate::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Request {
-    pub headers: HashMap<String, Vec<String>>,
+    pub headers: Headers,
     pub size: usize,
     pub body: Vec<u8>,
     pub method: Method,
@@ -25,12 +25,9 @@ enum RequestReadState {
 pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
     reader: &mut T,
 ) -> Result<Request> {
-    warn!("PRASE REQ");
-    // let mut host = None;
     let mut version = None;
     let mut method: Option<Method> = None;
-    // let mut url = None;
-    let mut headers = HashMap::<String, Vec<String>>::default();
+    let mut headers = Headers::default();
     let mut path = None;
     let mut body_len = None;
     let mut body = Vec::<u8>::new();
@@ -39,13 +36,10 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
     'request: loop {
         state = match state {
             RequestReadState::Version => {
-                debug!("reading http version");
                 let mut line: String = "".to_string();
-                debug!("getting version line");
                 reader.read_line(&mut line).await.map_err(|e| {
                     anyhow!("request ended early when reading version with error: {}", e)
                 })?;
-                debug!("got line: {}", line);
 
                 let fragments = line.split(" ").collect::<Vec<_>>();
                 match fragments.as_slice() {
@@ -65,11 +59,9 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
             }
             RequestReadState::Headers => {
                 let mut line: String = "".to_string();
-                debug!("getting header line");
                 reader.read_line(&mut line).await.map_err(|e| {
                     anyhow!("request ended early when reading version with error: {}", e)
                 })?;
-                debug!("got header line: {}", line);
 
                 match line.split_once(":") {
                     None => {
@@ -212,5 +204,70 @@ Accept: */*
         assert_eq!(8080, req.url.port().unwrap_or_default());
         assert_eq!("HTTP/1.1", req.version);
         assert_eq!(0, req.body.len());
+
+        let cases = vec![
+            ("Host", vec!["127.0.0.1:8080"]),
+            ("User-Agent", vec!["curl/7.83.1"]),
+            ("Foo", vec!["Bar"]),
+            ("Biz", vec!["Baz"]),
+            ("Cookie", vec!["asdf=123", "fghj=4567", "session=someid"]),
+            ("Accept", vec!["*/*"]),
+        ];
+        assert_headers_eq(cases, &req.headers);
+    }
+
+    #[tokio::test]
+    async fn test_basic_post_request_parse() {
+        let input = r#"POST / HTTP/1.1
+Accept: application/json, */*;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 29
+Content-Type: application/json
+Host: 127.0.0.1:8080
+User-Agent: HTTPie/3.2.1
+
+{
+    "foo": "bar",
+    "test": "baz"
+}
+"#;
+        let mut r = BufReader::new(input.as_bytes());
+
+        let req = parse_request(&mut r).await.unwrap();
+
+        assert_eq!(Method::POST, req.method);
+        assert_eq!("/", req.url.path());
+        assert_eq!("127.0.0.1".parse().ok().map(Host::Ipv4), req.url.host());
+        assert_eq!(8080, req.url.port().unwrap_or_default());
+        assert_eq!("HTTP/1.1", req.version);
+        assert_eq!(29, req.body.len());
+
+        let cases = vec![
+            ("Host", vec!["127.0.0.1:8080"]),
+            ("User-Agent", vec!["HTTPie/3.2.1"]),
+            ("Accept", vec!["application/json", "*/*;q=0.5"]),
+            ("Accept-Encoding", vec!["gzip", "deflate", "br"]),
+            ("Connection", vec!["keep-alive"]),
+            ("Content-Length", vec!["29"]),
+            ("Content-Type", vec!["application/json"]),
+        ];
+        assert_headers_eq(cases, &req.headers);
+    }
+
+    fn assert_headers_eq(expected: Vec<(&str, Vec<&str>)>, actual: &Headers) {
+        assert_eq!(expected.len(), actual.len());
+
+        for (header, expected) in expected {
+            let expected = expected.into_iter().map(|s| s.to_string()).collect();
+            assert_eq!(
+                Some(&expected),
+                actual.get(header),
+                "expected header '{}' to have value '{:?}', but had value '{:?}'",
+                header,
+                expected,
+                actual.get(header)
+            );
+        }
     }
 }
