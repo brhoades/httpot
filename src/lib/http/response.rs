@@ -1,8 +1,6 @@
 use std::string::ToString;
 
-use rand::prelude::*;
-
-use crate::{prelude::*, http::headers::Headers};
+use crate::http::headers::Headers;
 
 #[derive(Default, Builder, Debug)]
 #[builder(setter(into))]
@@ -39,7 +37,7 @@ where
 
     pub fn status_code<I: num::traits::ToPrimitive>(&mut self, status: I) -> &mut Self {
         // globally, these interfere with derive macros used for StatusCode
-        use num::traits::{ToPrimitive, FromPrimitive};
+        use num::traits::FromPrimitive;
         self.status_code = status.to_i64().and_then(StatusCode::from_i64);
         self
     }

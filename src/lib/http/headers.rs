@@ -48,7 +48,7 @@ impl Headers {
             .join("\n")
     }
 
-    pub fn add(&mut self, k: &str, v: &str) -> &mut Self {
+    pub fn add<S: ToString>(&mut self, k: &str, v: S) -> &mut Self {
         self.0
             .entry(k.to_string())
             .and_modify(|values| values.push(v.to_string()))
