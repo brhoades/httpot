@@ -66,10 +66,17 @@ pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> Response {
             <pre>
               <a href="../">"../"</a> "\n"
               { nodes.into_iter().map(|n| {
+                  let line = format!("{: <40}{: >20}{: >20}", n.name(), n.modified_at(), n.size().map(|s| s.to_string()).unwrap_or_else(|| "-".to_string()));
+                  // take the non-name portion of the line which is appropriately
+                  // space padded now
+                  let line = line[n.name().len()..].to_string();
+
                   html!(
                     <span>
                       <a href=n.name()>{ text!("{}", n.name()) }</a>
-                      "          "
+                      <span>
+                      { text!("{}", line) }
+                      </span>
                       "\n"
                     </span>
                   )
@@ -111,11 +118,29 @@ struct Folder {
     modified_at: DateTime<Utc>,
 }
 
+const MODIFIED_FORMAT: &str = "%d-%m-%Y %H:%M";
+
 impl Node {
     pub fn name(&self) -> String {
         match self {
             Node::Left(n) => n.name.to_owned(),
             Node::Right(n) => n.name.to_owned() + "/",
+        }
+    }
+
+    pub fn modified_at(&self) -> String {
+        let dt = match self {
+            Node::Left(n) => n.modified_at.format(MODIFIED_FORMAT),
+            Node::Right(n) => n.modified_at.format(MODIFIED_FORMAT),
+        };
+
+        format!("{}", dt)
+    }
+
+    pub fn size(&self) -> Option<usize> {
+        match self {
+            Node::Left(n) => Some(n.size),
+            Node::Right(n) => None,
         }
     }
 }

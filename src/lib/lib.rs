@@ -9,6 +9,6 @@ pub mod prelude {
     pub use log::{debug, error, info, trace, warn};
 }
 
+pub mod fs;
 pub mod http;
 pub mod util;
-pub mod fs;

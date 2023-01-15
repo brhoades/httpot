@@ -1,4 +1,7 @@
-use std::collections::{hash_map::{Entry, Iter}, HashMap};
+use std::collections::{
+    hash_map::{Entry, Iter},
+    HashMap,
+};
 
 /// Headers are key-value with multiple values. Adding a new header
 /// does not overwrite existing values, it only appends.
