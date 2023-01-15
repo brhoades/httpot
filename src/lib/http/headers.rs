@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{hash_map::{Entry, Iter}, HashMap};
 
 /// Headers are key-value with multiple values. Adding a new header
 /// does not overwrite existing values, it only appends.
@@ -54,6 +54,10 @@ impl Headers {
             .and_modify(|values| values.push(v.to_string()))
             .or_insert_with(|| vec![v.to_string()]);
         self
+    }
+
+    pub fn iter(&self) -> Iter<String, Vec<String>> {
+        self.0.iter()
     }
 }
 

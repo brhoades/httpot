@@ -1,3 +1,5 @@
+mod stock_responses;
+
 use log::LevelFilter;
 use pretty_env_logger::env_logger::Target;
 use structopt::StructOpt;
@@ -5,7 +7,10 @@ use structopt::StructOpt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, TcpStream};
 
-use httpot::prelude::*;
+use httpot::{
+    http::response::{Response, ResponseBuilder},
+    prelude::*,
+};
 
 #[derive(Debug, Clone, StructOpt)]
 #[structopt(name = "httpot", about = "HTTP [honeyp]ot")]
@@ -77,25 +82,9 @@ async fn process_socket(s: TcpStream) -> Result<()> {
 
         req?;
 
-        let body = r#"<html>
-  <body>
-    <h1>Hello, World!</h1>
-  </body>
-</html>
-"#;
-
-        let resp = r#"HTTP/1.1 200 OK
-Server: Apache/2.2.14 (Win32)
-Content-Length: "#
-            .to_owned()
-            + &body.len().to_string()
-            + r#"
-Content-Type: text/html
-
-"# + body;
-
+        let resp = stock_responses::hello_world_response();
         info!("write resp");
-        let res = w.try_write(&resp.as_bytes());
+        let res = w.try_write(&resp.as_bytes()?);
         info!("wrote resp with result: {:?}", res);
         res?;
     }

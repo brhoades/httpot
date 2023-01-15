@@ -64,8 +64,7 @@ pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> Response<Vec<u8>> {
         </html>
     );
 
-    let b = doc.to_string();
-    let b = b.as_bytes();
+    let b = doc.to_string().into_bytes();
     ResponseBuilder::default()
         .add_header("Content-Type", "text/html")
         .add_header("Content-Length", b.len())

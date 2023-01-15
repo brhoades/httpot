@@ -1,8 +1,9 @@
+use std::fmt;
 use std::string::ToString;
 
-use crate::http::headers::Headers;
+use crate::{http::headers::Headers, prelude::*};
 
-#[derive(Default, Builder, Debug)]
+#[derive(Default, Builder, Debug, Clone)]
 #[builder(setter(into))]
 pub struct Response<B>
 where
@@ -10,9 +11,44 @@ where
 {
     #[builder(setter(custom))]
     status_code: StatusCode,
+    #[builder(setter(custom))]
     body: B,
     #[builder(setter(custom))]
     headers: Headers,
+
+    #[builder(setter(into, strip_option), default)]
+    version: Option<String>,
+}
+
+impl<B: AsRef<[u8]>> Response<B> {
+    pub fn to_string(&self) -> Result<String> {
+        let mut lines: Vec<String> = vec![format!(
+            "{} {} {}",
+            self.version
+                .clone()
+                .unwrap_or_else(|| "HTTP/1.1".to_string()),
+            self.status_code as i32,
+            self.status_code.to_string(),
+        )];
+
+        lines.extend(
+            self.headers
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, v.as_slice().join(", ")))
+                .collect::<Vec<_>>(),
+        );
+        lines.push("".to_string());
+        lines.push(
+            String::from_utf8(self.body.as_ref().to_vec())
+                .map_err(|e| anyhow!("body failed to convert to utf8: {}", e))?,
+        );
+
+        Ok(lines.as_slice().join("\r\n"))
+    }
+
+    pub fn as_bytes(&self) -> Result<Vec<u8>> {
+        self.to_string().map(|s| s.into_bytes())
+    }
 }
 
 impl<B> ResponseBuilder<B>
@@ -39,6 +75,19 @@ where
         // globally, these interfere with derive macros used for StatusCode
         use num::traits::FromPrimitive;
         self.status_code = status.to_i64().and_then(StatusCode::from_i64);
+        self
+    }
+
+    pub fn body(&mut self, body: B) -> &mut Self {
+        let len = body.as_ref().len();
+
+        self.body = Some(body);
+        self.add_header("Content-Length", len);
+        self
+    }
+
+    pub fn ok(&mut self) -> &mut Self {
+        self.status_code = Some(StatusCode::Ok);
         self
     }
 }
@@ -78,3 +127,41 @@ pub enum StatusCode {
     HTTPVersionNotSupported = 505,
 }
 
+impl StatusCode {
+    pub fn to_string(&self) -> String {
+        use StatusCode::*;
+
+        match self {
+            Ok => "OK",
+            Created => "Created",
+            Accepted => "Accepted",
+            NoContent => "No Content",
+
+            MovedPermanently => "Moved Permanently",
+            Found => "Found",
+            SeeOther => "See Other",
+            TemporaryRedirect => "Temporary Redirect",
+            PermanentRedirect => "Permanent Redirect",
+
+            Unauthorized => "Unauthorized",
+            Forbidden => "Forbidden",
+            MethodNotAllowed => "Method Not Allowed",
+            RequestTimeout => "Request Timeout",
+            Gone => "Gone",
+            LengthRequired => "Length Required",
+            PayloadTooLarge => "Payload Too Large",
+            ImATeapot => "Im A Teapot",
+
+            InternalServerError => "Internal Server Error",
+            NotImplemented => "Not Implemented",
+            HTTPVersionNotSupported => "HTTP Version not Supported",
+        }
+        .to_string()
+    }
+}
+
+impl fmt::Display for StatusCode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
