@@ -1,4 +1,4 @@
-use typed_html::{dom::DOMTree, elements::FlowContent, html, text, types::Metadata, OutputType};
+use typed_html::{dom::DOMTree, html, text, types::Metadata};
 
 use httpot::http::response::{Response, ResponseBuilder};
 
@@ -17,7 +17,6 @@ macro_rules! boilerplate {
         </html>
       )
     };
-
     ($tokens:expr) => {
         boilerplate!("", text!(""), $tokens)
     };

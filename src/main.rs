@@ -7,10 +7,7 @@ use structopt::StructOpt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, TcpStream};
 
-use httpot::{
-    http::response::{Response, ResponseBuilder},
-    prelude::*,
-};
+use httpot::prelude::*;
 
 #[derive(Debug, Clone, StructOpt)]
 #[structopt(name = "httpot", about = "HTTP [honeyp]ot")]
