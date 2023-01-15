@@ -17,5 +17,12 @@ url = "2"
 typed-html = { git = "https://github.com/bodil/typed-html", branch = "master" }
 derive_builder = "0.12"
 
+rand = "0.8"
+chrono = "0.4"
+
+num = "0.4"
+num-traits = "0.2"
+num-derive = "0.3"
+
 [lib]
 path = "src/lib/lib.rs"
