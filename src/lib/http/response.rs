@@ -5,14 +5,11 @@ use crate::{http::headers::Headers, prelude::*};
 
 #[derive(Default, Builder, Debug, Clone)]
 #[builder(setter(into))]
-pub struct Response<B>
-where
-    B: AsRef<[u8]>,
-{
+pub struct Response {
     #[builder(setter(custom))]
     status_code: StatusCode,
     #[builder(setter(custom))]
-    body: B,
+    body: Vec<u8>,
     #[builder(setter(custom))]
     headers: Headers,
 
@@ -20,13 +17,15 @@ where
     version: Option<String>,
 }
 
-impl<B: AsRef<[u8]>> Response<B> {
+impl Response {
     pub fn to_string(&self) -> Result<String> {
+        self.clone().into_string()
+    }
+
+    pub fn into_string(self) -> Result<String> {
         let mut lines: Vec<String> = vec![format!(
             "{} {} {}",
-            self.version
-                .clone()
-                .unwrap_or_else(|| "HTTP/1.1".to_string()),
+            self.version.unwrap_or_else(|| "HTTP/1.1".to_string()),
             self.status_code as i32,
             self.status_code.to_string(),
         )];
@@ -39,7 +38,7 @@ impl<B: AsRef<[u8]>> Response<B> {
         );
         lines.push("".to_string());
         lines.push(
-            String::from_utf8(self.body.as_ref().to_vec())
+            String::from_utf8(self.body)
                 .map_err(|e| anyhow!("body failed to convert to utf8: {}", e))?,
         );
 
@@ -51,10 +50,21 @@ impl<B: AsRef<[u8]>> Response<B> {
     }
 }
 
-impl<B> ResponseBuilder<B>
-where
-    B: AsRef<[u8]>,
-{
+impl ResponseBuilder {
+    pub fn ok() -> Self {
+        let mut s: Self = Default::default();
+        s.status_code = Some(StatusCode::Ok);
+        s
+    }
+
+    pub fn not_found() -> Self {
+        let mut s: Self = Default::default();
+        s.status_code = Some(StatusCode::NotFound);
+        s
+    }
+}
+
+impl ResponseBuilder {
     pub fn add_headers<S: ToString>(&mut self, name: &str, values: Vec<S>) -> &mut Self {
         for v in values {
             self.add_header(name, v);
@@ -78,16 +88,12 @@ where
         self
     }
 
-    pub fn body(&mut self, body: B) -> &mut Self {
-        let len = body.as_ref().len();
+    pub fn body<B: AsRef<[u8]>>(&mut self, body: B) -> &mut Self {
+        let body = body.as_ref().iter().cloned().collect::<Vec<_>>();
+        let len = body.len();
 
         self.body = Some(body);
         self.add_header("Content-Length", len);
-        self
-    }
-
-    pub fn ok(&mut self) -> &mut Self {
-        self.status_code = Some(StatusCode::Ok);
         self
     }
 }
@@ -114,7 +120,8 @@ pub enum StatusCode {
     // 400s
     Unauthorized = 401,
     Forbidden = 403,
-    MethodNotAllowed = 405,
+    NotFound,
+    MethodNotAllowed,
     RequestTimeout = 408,
     Gone = 410,
     LengthRequired = 411,
@@ -145,6 +152,7 @@ impl StatusCode {
 
             Unauthorized => "Unauthorized",
             Forbidden => "Forbidden",
+            NotFound => "Not Found",
             MethodNotAllowed => "Method Not Allowed",
             RequestTimeout => "Request Timeout",
             Gone => "Gone",

@@ -37,7 +37,7 @@ fn gen_fake_nodes<T: Hash>(seed: T, path: &str) -> Vec<Node> {
         .collect()
 }
 
-pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> Response<Vec<u8>> {
+pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> Response {
     let nodes = gen_fake_nodes(seed, path);
 
     let doc: DOMTree<String> = html!(
@@ -64,12 +64,11 @@ pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> Response<Vec<u8>> {
         </html>
     );
 
-    let b = doc.to_string().into_bytes();
-    ResponseBuilder::default()
+    let doc = doc.to_string();
+    ResponseBuilder::ok()
         .add_header("Content-Type", "text/html")
-        .add_header("Content-Length", b.len())
-        .status_code(200)
-        .body(b)
+        .add_header("Content-Length", doc.len())
+        .body(doc)
         .build()
         .unwrap()
 }

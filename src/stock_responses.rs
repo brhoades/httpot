@@ -1,6 +1,13 @@
 use typed_html::{dom::DOMTree, html, text, types::Metadata};
 
-use httpot::http::response::{Response, ResponseBuilder};
+use httpot::{
+    fs::fake,
+    http::{
+        request::Request,
+        response::{Response, ResponseBuilder},
+    },
+    prelude::*,
+};
 
 #[macro_export]
 macro_rules! boilerplate {
@@ -22,15 +29,29 @@ macro_rules! boilerplate {
     };
 }
 
-pub(crate) fn hello_world_response() -> Response<String> {
+pub(crate) fn hello_world() -> Response {
     let body: DOMTree<String> = boilerplate!("Hello World!", html!(<h1>"Hello, World!"</h1>));
 
-    ResponseBuilder::default()
-        .ok()
+    ResponseBuilder::ok()
         .add_header("Server", "Apache/2.2.14 (Win32)")
         .add_header("Content-Type", "text/html")
-        .version("HTTP/1.1")
         .body(body.to_string())
         .build()
         .unwrap()
+}
+
+pub(crate) fn not_found() -> Response {
+    let body: DOMTree<String> = boilerplate!("Not Found", html!(<h1>"Not Found"</h1>));
+
+    ResponseBuilder::not_found()
+        .add_header("Server", "Apache/2.2.14 (Win32)")
+        .body(body.to_string())
+        .build()
+        .unwrap()
+}
+
+const SEED: &str = "seedv1";
+
+pub(crate) fn fake_directory_tree(req: &Request) -> Result<Response> {
+    Ok(fake::gen_fake_listing(SEED, req.url.path()))
 }

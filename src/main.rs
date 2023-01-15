@@ -7,7 +7,10 @@ use structopt::StructOpt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, TcpStream};
 
-use httpot::prelude::*;
+use httpot::{
+    http::{request::Request, response::Response},
+    prelude::*,
+};
 
 #[derive(Debug, Clone, StructOpt)]
 #[structopt(name = "httpot", about = "HTTP [honeyp]ot")]
@@ -74,15 +77,22 @@ async fn process_socket(s: TcpStream) -> Result<()> {
     info!("get socket start...");
     loop {
         r.get_ref().readable().await?;
-        let req = httpot::http::request::parse_request(&mut r).await;
-        trace!("req: {:#?}", req);
+        let req = httpot::http::request::parse_request(&mut r).await?;
 
-        req?;
+        let resp = router(&req).await?;
 
-        let resp = stock_responses::hello_world_response();
-        info!("write resp");
         let res = w.try_write(&resp.as_bytes()?);
         info!("wrote resp with result: {:?}", res);
         res?;
+    }
+}
+
+async fn router(r: &Request) -> Result<Response> {
+    use stock_responses::*;
+
+    match r.url.path() {
+        "/hello" => Ok(hello_world()),
+        "/favicon.ico" => Ok(not_found()),
+        _ => fake_directory_tree(r),
     }
 }
