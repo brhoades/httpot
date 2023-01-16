@@ -1,6 +1,8 @@
 use std::fmt;
 use std::string::ToString;
 
+use chrono::offset::Utc;
+
 use crate::{http::headers::Headers, prelude::*};
 
 #[derive(Builder, Debug, Clone)]
@@ -10,34 +12,29 @@ pub struct Response {
     status_code: StatusCode,
     #[builder(setter(custom))]
     body: Vec<u8>,
-    #[builder(setter(custom))]
+    #[builder(setter(custom), default = "default_headers()")]
     headers: Headers,
 
     #[builder(setter(into, strip_option), default)]
     version: Option<String>,
 }
 
-impl std::default::Default for Response {
-    fn default() -> Self {
-        let mut headers = Headers::default();
-        headers.add(
-            "Server",
-            format!(
-                "httpot{}",
-                if let Ok(ver) = std::env::var("CARGO_PKG_VERSION") {
-                    "/".to_owned() + &ver
-                } else {
-                    "".to_string()
-                }
-            ),
-        );
-        Self {
-            status_code: StatusCode::Ok,
-            body: vec![],
-            headers,
-            version: None,
-        }
-    }
+fn default_headers() -> Headers {
+    let mut headers = Headers::default();
+    headers.add(
+        "Server",
+        format!(
+            "httpot{}",
+            if let Ok(ver) = std::env::var("CARGO_PKG_VERSION") {
+                "/".to_owned() + &ver
+            } else {
+                "".to_string()
+            }
+        ),
+    );
+    headers.add("Date", Utc::now().format("%a, %d %b %Y %H:%M:%S GMT"));
+
+    headers
 }
 
 impl Response {
@@ -105,7 +102,7 @@ impl ResponseBuilder {
 
     pub fn add_header<S: ToString>(&mut self, name: &str, value: S) -> &mut Self {
         if self.headers.is_none() {
-            self.headers = Some(Headers::default());
+            self.headers = Some(default_headers());
         }
         self.headers.as_mut().unwrap().add(name, value);
 
