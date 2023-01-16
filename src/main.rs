@@ -1,4 +1,5 @@
 mod router;
+mod runtime;
 mod stock_responses;
 
 use log::LevelFilter;
@@ -25,14 +26,20 @@ struct Opt {
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt = Opt::from_args();
-    init_logging(&opt);
+    runtime::logging(&opt.log_level, &opt.log_target);
 
     info!("listening on {}", &opt.listen_addr);
 
     let listener = TcpListener::bind(opt.listen_addr).await?;
 
     loop {
-        let (socket, _) = listener.accept().await?;
+        let (socket, _) = tokio::select!(
+            socket_res = listener.accept() => socket_res?,
+            _ = runtime::interrupt() => {
+                warn!("signal received");
+                return Ok(());
+            }
+        );
 
         tokio::spawn(async move {
             let remote = socket
@@ -45,26 +52,6 @@ async fn main() -> Result<()> {
                 Err(e) => info!("session with {} errored: {}", remote, e),
             }
         });
-    }
-}
-
-fn init_logging(opt: &Opt) {
-    let mut builder = pretty_env_logger::formatted_timed_builder();
-    let level = if let Some(lvl) = opt.log_level {
-        lvl
-    } else if let Ok(lvl) = std::env::var("RUST_LOG") {
-        lvl.parse().unwrap()
-    } else {
-        LevelFilter::Info
-    };
-
-    builder.filter_level(level);
-
-    let res = builder.target(opt.log_target).try_init();
-
-    match res {
-        Err(e) => println!("failed to init {}", e),
-        Ok(_) => warn!("logger initialized at level={}", level),
     }
 }
 
