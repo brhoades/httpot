@@ -1,3 +1,4 @@
+mod router;
 mod stock_responses;
 
 use log::LevelFilter;
@@ -7,10 +8,7 @@ use structopt::StructOpt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, TcpStream};
 
-use httpot::{
-    http::{request::Request, response::Response},
-    prelude::*,
-};
+use httpot::prelude::*;
 
 #[derive(Debug, Clone, StructOpt)]
 #[structopt(name = "httpot", about = "HTTP [honeyp]ot")]
@@ -96,7 +94,7 @@ async fn process_socket(s: TcpStream) -> Result<()> {
             truncate(req.url.path(), 20),
         );
 
-        let resp = router(&req).await?;
+        let resp = router::router(&req).await?;
 
         w.try_write(&resp.as_bytes()?)?;
 
@@ -106,16 +104,6 @@ async fn process_socket(s: TcpStream) -> Result<()> {
             resp.status_code().to_string(),
             resp.len(),
         );
-    }
-}
-
-async fn router(r: &Request) -> Result<Response> {
-    use stock_responses::*;
-
-    match r.url.path() {
-        "/hello" => Ok(hello_world()),
-        "/favicon.ico" => Ok(not_found()),
-        _ => fake_directory_tree(r),
     }
 }
 

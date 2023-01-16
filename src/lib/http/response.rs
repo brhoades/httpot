@@ -3,7 +3,7 @@ use std::string::ToString;
 
 use crate::{http::headers::Headers, prelude::*};
 
-#[derive(Default, Builder, Debug, Clone)]
+#[derive(Builder, Debug, Clone)]
 #[builder(setter(into))]
 pub struct Response {
     #[builder(setter(custom))]
@@ -15,6 +15,29 @@ pub struct Response {
 
     #[builder(setter(into, strip_option), default)]
     version: Option<String>,
+}
+
+impl std::default::Default for Response {
+    fn default() -> Self {
+        let mut headers = Headers::default();
+        headers.add(
+            "Server",
+            format!(
+                "httpot{}",
+                if let Ok(ver) = std::env::var("CARGO_PKG_VERSION") {
+                    "/".to_owned() + &ver
+                } else {
+                    "".to_string()
+                }
+            ),
+        );
+        Self {
+            status_code: StatusCode::Ok,
+            body: vec![],
+            headers,
+            version: None,
+        }
+    }
 }
 
 impl Response {

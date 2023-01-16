@@ -4,7 +4,7 @@ use httpot::{
     fs::fake,
     http::{
         request::Request,
-        response::{Response, ResponseBuilder},
+        response::{Response, ResponseBuilder, StatusCode},
     },
     prelude::*,
 };
@@ -33,7 +33,6 @@ pub(crate) fn hello_world() -> Response {
     let body: DOMTree<String> = boilerplate!("Hello World!", html!(<h1>"Hello, World!"</h1>));
 
     ResponseBuilder::ok()
-        .add_header("Server", "Apache/2.2.14 (Win32)")
         .add_header("Content-Type", "text/html")
         .body(body.to_string())
         .build()
@@ -44,14 +43,25 @@ pub(crate) fn not_found() -> Response {
     let body: DOMTree<String> = boilerplate!("Not Found", html!(<h1>"Not Found"</h1>));
 
     ResponseBuilder::not_found()
-        .add_header("Server", "Apache/2.2.14 (Win32)")
+        .add_header("Content-Type", "text/html")
         .body(body.to_string())
         .build()
         .unwrap()
+}
+pub(crate) fn generic_status(status: StatusCode) -> ResponseBuilder {
+    let stat_str = text!("{}", status.to_string());
+    let body: DOMTree<String> = boilerplate!(stat_str, html!(<h1>{stat_str}</h1>));
+
+    let mut resp = ResponseBuilder::default();
+    resp.add_header("Content-Type", "text/html")
+        .body(body.to_string())
+        .status_code(status);
+    resp
 }
 
 const SEED: &str = "seedv1";
 
 pub(crate) fn fake_directory_tree(req: &Request) -> Result<Response> {
+    //
     Ok(fake::gen_fake_listing(SEED, req.url.path()))
 }
