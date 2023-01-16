@@ -1,5 +1,4 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fmt;
 use std::hash::{Hash, Hasher};
 
 use chrono::{offset::Utc, DateTime, Datelike, TimeZone, Timelike};
@@ -8,7 +7,6 @@ use rand::{
     prelude::*,
     Fill,
 };
-use typed_html::types::Datetime;
 use typed_html::{dom::DOMTree, html, text, types::Metadata};
 
 use crate::{
@@ -140,7 +138,7 @@ impl Node {
     pub fn size(&self) -> Option<usize> {
         match self {
             Node::Left(n) => Some(n.size),
-            Node::Right(n) => None,
+            Node::Right(_) => None,
         }
     }
 }
