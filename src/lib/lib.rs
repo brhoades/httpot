@@ -10,5 +10,6 @@ pub mod prelude {
 }
 
 pub mod fs;
+pub mod honeypot;
 pub mod http;
 pub mod util;

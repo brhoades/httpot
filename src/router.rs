@@ -1,4 +1,5 @@
 use httpot::{
+    honeypot::php,
     http::{
         request::{Method, Request},
         response::{Response, StatusCode},
@@ -19,6 +20,10 @@ pub async fn router(r: &Request) -> Result<Response> {
                 .build()?)
         }
     };
+
+    if php::is_easter_egg(r) {
+        return php::easter_egg(r);
+    }
 
     match r.url.path() {
         "/hello" => Ok(hello_world()),

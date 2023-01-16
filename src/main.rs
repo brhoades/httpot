@@ -9,7 +9,7 @@ use structopt::StructOpt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, TcpStream};
 
-use httpot::prelude::*;
+use httpot::{http::request, prelude::*};
 
 #[derive(Debug, Clone, StructOpt)]
 #[structopt(name = "httpot", about = "HTTP [honeyp]ot")]
@@ -62,9 +62,8 @@ async fn process_socket(s: TcpStream) -> Result<()> {
 
     let mut r = BufReader::new(r);
     debug!("get socket start...");
-    // loop {
     r.get_ref().readable().await?;
-    let req = httpot::http::request::parse_request(&mut r).await?;
+    let req = request::parse_request(&mut r).await?;
     info!(
         "{: <8} {: <20} ==> {: <8} {} bytes {}",
         addr,
