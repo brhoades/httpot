@@ -33,8 +33,17 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind(opt.listen_addr).await?;
 
     loop {
-        let (socket, _) = tokio::select!(
-            socket_res = listener.accept() => socket_res?,
+        let socket = tokio::select!(
+            socket = listener.accept() => {
+                match socket {
+                    Err(e) => {
+                        warn!("failed to accept conn: {}", e);
+                        continue;
+                    }
+                    Ok((socket, _)) => socket,
+                }
+
+            },
             _ = runtime::interrupt() => {
                 warn!("signal received");
                 return Ok(());
@@ -45,7 +54,7 @@ async fn main() -> Result<()> {
             let remote = socket
                 .peer_addr()
                 .map(|s| s.to_string())
-                .unwrap_or_else(|e| format!("unknown addr '{}'", e));
+                .unwrap_or_else(|e| format!("'unknown addr {}'", e));
 
             match process_socket(socket).await {
                 Ok(_) => info!("session with {} ended successfully", remote),
