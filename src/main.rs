@@ -71,19 +71,41 @@ fn init_logging(opt: &Opt) {
 }
 
 async fn process_socket(s: TcpStream) -> Result<()> {
+    let addr = s.peer_addr()?.to_string();
+
     let (r, w) = s.into_split();
 
     let mut r = BufReader::new(r);
-    info!("get socket start...");
+    debug!("get socket start...");
     loop {
         r.get_ref().readable().await?;
         let req = httpot::http::request::parse_request(&mut r).await?;
+        info!(
+            "{: <8} {: <20} ==> {: <8} {} bytes {}",
+            addr,
+            truncate(
+                &req.headers
+                    .get("User-Agent")
+                    .and_then(|v| v.first())
+                    .cloned()
+                    .unwrap_or_else(|| "Unknown".to_string()),
+                20
+            ),
+            req.method.to_string(),
+            req.body.len(),
+            truncate(req.url.path(), 20),
+        );
 
         let resp = router(&req).await?;
 
-        let res = w.try_write(&resp.as_bytes()?);
-        info!("wrote resp with result: {:?}", res);
-        res?;
+        w.try_write(&resp.as_bytes()?)?;
+
+        info!(
+            "{: <8} <== {: <4} {: >8} bytes",
+            addr,
+            resp.status_code().to_string(),
+            resp.len(),
+        );
     }
 }
 
@@ -95,4 +117,16 @@ async fn router(r: &Request) -> Result<Response> {
         "/favicon.ico" => Ok(not_found()),
         _ => fake_directory_tree(r),
     }
+}
+
+fn truncate(s: &str, max_chars: usize) -> String {
+    if s.len() <= max_chars - 3 {
+        return s.to_string();
+    }
+
+    format!(
+        "{}...{}",
+        s[0..(max_chars - 3) / 2].to_string(),
+        s[(s.len() - (max_chars - 3) / 2)..s.len()].to_string()
+    )
 }

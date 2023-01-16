@@ -48,6 +48,14 @@ impl Response {
     pub fn as_bytes(&self) -> Result<Vec<u8>> {
         self.to_string().map(|s| s.into_bytes())
     }
+
+    pub fn status_code(&self) -> StatusCode {
+        self.status_code
+    }
+
+    pub fn len(&self) -> usize {
+        self.body.len()
+    }
 }
 
 impl ResponseBuilder {

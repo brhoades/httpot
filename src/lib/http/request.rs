@@ -65,7 +65,7 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
 
                 match line.split_once(":") {
                     None => {
-                        info!("done reading header: '{:?}'", line);
+                        debug!("done reading header: '{:?}'", line);
                         RequestReadState::Body
                     } // presumptive done?
                     Some((name, val)) => {
@@ -174,6 +174,22 @@ impl std::str::FromStr for Method {
             "TRACE" => TRACE,
             other => bail!("unknown HTTP method: {}", other),
         })
+    }
+}
+
+impl Method {
+    pub fn to_string(&self) -> String {
+        use Method::*;
+        match self {
+            GET => "GET",
+            HEAD => "HEAD",
+            POST => "POST",
+            PUT => "PUT",
+            DELETE => "DELETE",
+            CONNECT => "CONNECT",
+            OPTIONS => "OPTIONS",
+            TRACE => "TRACE",
+        }.to_string()
     }
 }
 
