@@ -75,36 +75,38 @@ async fn process_socket(s: TcpStream) -> Result<()> {
 
     let mut r = BufReader::new(r);
     debug!("get socket start...");
-    loop {
-        r.get_ref().readable().await?;
-        let req = httpot::http::request::parse_request(&mut r).await?;
-        info!(
-            "{: <8} {: <20} ==> {: <8} {} bytes {}",
-            addr,
-            truncate(
-                &req.headers
-                    .get("User-Agent")
-                    .and_then(|v| v.first())
-                    .cloned()
-                    .unwrap_or_else(|| "Unknown".to_string()),
-                20
-            ),
-            req.method.to_string(),
-            req.body.len(),
-            truncate(req.url.path(), 20),
-        );
+    // loop {
+    r.get_ref().readable().await?;
+    let req = httpot::http::request::parse_request(&mut r).await?;
+    info!(
+        "{: <8} {: <20} ==> {: <8} {} bytes {}",
+        addr,
+        truncate(
+            &req.headers
+                .get("User-Agent")
+                .and_then(|v| v.first())
+                .cloned()
+                .unwrap_or_else(|| "Unknown".to_string()),
+            20
+        ),
+        req.method.to_string(),
+        req.body.len(),
+        truncate(req.url.path(), 20),
+    );
 
-        let resp = router::router(&req).await?;
+    let resp = router::router(&req).await?;
 
-        w.try_write(&resp.as_bytes()?)?;
+    w.try_write(&resp.as_bytes()?)?;
 
-        info!(
-            "{: <8} <== {: <4} {: >8} bytes",
-            addr,
-            resp.status_code().to_string(),
-            resp.len(),
-        );
-    }
+    info!(
+        "{: <8} <== {: <4} {: >8} bytes",
+        addr,
+        resp.status_code().to_string(),
+        resp.len(),
+    );
+
+    // close conn
+    Ok(())
 }
 
 fn truncate(s: &str, max_chars: usize) -> String {
