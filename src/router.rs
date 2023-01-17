@@ -3,13 +3,12 @@ use httpot::{
     http::{
         request::{Method, Request},
         response::{Response, StatusCode},
+        stock_responses::*,
     },
     prelude::*,
 };
 
 pub async fn router(r: &Request) -> Result<Response> {
-    use crate::stock_responses::*;
-
     // invalid methods
     match r.method {
         Method::GET => (),

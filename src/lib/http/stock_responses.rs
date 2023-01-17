@@ -1,6 +1,6 @@
 use typed_html::{dom::DOMTree, html, text, types::Metadata};
 
-use httpot::{
+use crate::{
     fs::fake,
     http::{
         request::Request,
@@ -29,7 +29,7 @@ macro_rules! boilerplate {
     };
 }
 
-pub(crate) fn hello_world() -> Response {
+pub fn hello_world() -> Response {
     let body: DOMTree<String> = boilerplate!("Hello World!", html!(<h1>"Hello, World!"</h1>));
 
     ResponseBuilder::ok()
@@ -39,7 +39,7 @@ pub(crate) fn hello_world() -> Response {
         .unwrap()
 }
 
-pub(crate) fn not_found() -> Response {
+pub fn not_found() -> Response {
     let body: DOMTree<String> = boilerplate!("Not Found", html!(<h1>"Not Found"</h1>));
 
     ResponseBuilder::not_found()
@@ -48,7 +48,7 @@ pub(crate) fn not_found() -> Response {
         .build()
         .unwrap()
 }
-pub(crate) fn generic_status(status: StatusCode) -> ResponseBuilder {
+pub fn generic_status(status: StatusCode) -> ResponseBuilder {
     let stat_str = text!("{}", status.to_string());
     let body: DOMTree<String> = boilerplate!(stat_str, html!(<h1>{stat_str}</h1>));
 
@@ -61,7 +61,7 @@ pub(crate) fn generic_status(status: StatusCode) -> ResponseBuilder {
 
 const SEED: &str = "seedv1";
 
-pub(crate) fn fake_directory_tree(req: &Request) -> Result<Response> {
+pub fn fake_directory_tree(req: &Request) -> Result<Response> {
     //
     Ok(fake::gen_fake_listing(SEED, req.url.path()))
 }

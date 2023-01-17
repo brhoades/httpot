@@ -146,7 +146,8 @@ pub enum StatusCode {
     PermanentRedirect,
 
     // 400s
-    Unauthorized = 401,
+    BadRequest = 400,
+    Unauthorized,
     Forbidden = 403,
     NotFound,
     MethodNotAllowed,
@@ -178,6 +179,7 @@ impl StatusCode {
             TemporaryRedirect => "Temporary Redirect",
             PermanentRedirect => "Permanent Redirect",
 
+            BadRequest => "BadRequest",
             Unauthorized => "Unauthorized",
             Forbidden => "Forbidden",
             NotFound => "Not Found",

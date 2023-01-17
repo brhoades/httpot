@@ -1,11 +1,12 @@
+mod metrics;
 mod router;
 mod runtime;
-mod stock_responses;
+
+use std::net::SocketAddr;
 
 use log::LevelFilter;
 use pretty_env_logger::env_logger::Target;
 use structopt::StructOpt;
-
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -20,7 +21,11 @@ struct Opt {
     #[structopt(long = "log-target", default_value = "stderr", parse(try_from_str = httpot::util::logtarget_parse))]
     log_target: Target,
 
-    listen_addr: std::net::SocketAddr,
+    #[structopt(long = "metrics-addr")]
+    /// prometheus metrics addr
+    metrics_addr: Option<SocketAddr>,
+
+    listen_addr: SocketAddr,
 }
 
 #[tokio::main]
@@ -28,44 +33,54 @@ async fn main() -> Result<()> {
     let opt = Opt::from_args();
     runtime::logging(&opt.log_level, &opt.log_target);
 
-    info!("listening on {}", &opt.listen_addr);
+    tokio::select!(
+        res = listen_loop(opt.listen_addr) => {
+            error!("primary listen loop exited unexpectedly");
+            res?;
+        },
+        res = runtime::interrupt() => {
+            warn!("signal received");
+            res?;
+            return Ok(());
+        }
+        res = metrics::run(opt.metrics_addr) => {
+            error!("metrics loop exited unexpectedly");
+            res?;
+        },
+    );
 
-    let listener = TcpListener::bind(opt.listen_addr).await?;
+    Ok(())
+}
+
+async fn listen_loop(addr: SocketAddr) -> Result<()> {
+    let listener = TcpListener::bind(addr).await?;
+    info!("listening on {}", &addr);
 
     loop {
-        let socket = tokio::select!(
-            socket = listener.accept() => {
-                match socket {
-                    Err(e) => {
-                        warn!("failed to accept conn: {}", e);
-                        continue;
-                    }
-                    Ok((socket, _)) => socket,
+        let socket = listener.accept().await;
+        match socket {
+            Err(e) => {
+                warn!("failed to accept conn: {}", e);
+                continue;
+            }
+            Ok((socket, _)) => tokio::spawn(async move {
+                let remote = socket
+                    .peer_addr()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|e| format!("'unknown addr {}'", e));
+
+                match process_socket(socket).await {
+                    Ok(_) => info!("session with {} ended successfully", remote),
+                    Err(e) => info!("session with {} errored: {}", remote, e),
                 }
-
-            },
-            _ = runtime::interrupt() => {
-                warn!("signal received");
-                return Ok(());
-            }
-        );
-
-        tokio::spawn(async move {
-            let remote = socket
-                .peer_addr()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|e| format!("'unknown addr {}'", e));
-
-            match process_socket(socket).await {
-                Ok(_) => info!("session with {} ended successfully", remote),
-                Err(e) => info!("session with {} errored: {}", remote, e),
-            }
-        });
+            }),
+        };
     }
 }
 
 async fn process_socket(s: TcpStream) -> Result<()> {
     let addr = s.peer_addr()?.to_string();
+    metrics::count("conn_accept", "Incoming accepted TCP connections")?;
 
     let (r, w) = s.into_split();
 
@@ -73,6 +88,7 @@ async fn process_socket(s: TcpStream) -> Result<()> {
     debug!("get socket start...");
     r.get_ref().readable().await?;
     let req = request::parse_request(&mut r).await?;
+
     info!(
         "{: <8} {: <20} ==> {: <8} {} bytes {}",
         addr,
