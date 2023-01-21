@@ -61,9 +61,9 @@ async fn process_req(s: TcpStream) -> Result<()> {
     r.readable().await?;
 
     let req = parse_request(&addr, &mut BufReader::new(r)).await?;
-    if req.url.path() != "/" || req.method != Method::GET {
+    if (req.url.path() != "/" && req.url.path() != "/metrics") || req.method != Method::GET {
         warn!(
-            "from {} => only reqs to / are supported, got {} {}",
+            "from {} => only reqs to / and /metrics are supported, got {} {}",
             addr,
             req.method.to_string(),
             req.url
