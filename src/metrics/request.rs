@@ -8,24 +8,24 @@ use httpot::{http::request::Request, prelude::*};
 
 lazy_static! {
     pub static ref HTTP_REQUEST: prom::HistogramVec = register_histogram_vec!(
-        "http_request",
+        "httpot_http_request",
         "Incoming HTTP request read and parse time",
         &["method", "remote_addr", "user_agent", "version"]
     )
     .unwrap();
     pub static ref HTTP_REQUEST_PARSE_FAILURES: prom::Histogram = register_histogram!(
-        "http_request_parse_failures",
+        "httpot_http_request_parse_failures",
         "Incoming HTTP request parse failures time",
     )
     .unwrap();
     pub static ref HTTP_REQUEST_BODY: prom::CounterVec = register_counter_vec!(
-        "http_request_body_size",
+        "httpot_http_request_body_size",
         "Incoming HTTP request cumulative body size",
         &["method", "remote_addr", "user_agent", "version"]
     )
     .unwrap();
     pub static ref HTTP_REQUEST_PATH_LENGTH: prom::CounterVec = register_counter_vec!(
-        "http_request_path_length",
+        "httpot_http_request_path_length",
         "Incoming HTTP request cumulative request path length",
         &["method", "remote_addr", "user_agent", "version"]
     )
