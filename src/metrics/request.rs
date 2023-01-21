@@ -1,10 +1,9 @@
 use lazy_static::lazy_static;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use prometheus::{self as prom, register_counter_vec, register_histogram, register_histogram_vec};
 use std::future::Future;
 
-use crate::metrics::statics;
 use httpot::{http::request::Request, prelude::*};
 
 lazy_static! {
@@ -39,7 +38,7 @@ pub async fn observe_request<R: Future<Output = Result<Request>>>(req: R) -> Res
     let elapsed = start.elapsed().as_secs_f64();
 
     if req.is_err() {
-        HTTP_REQUEST_PARSE_FAILURES.observe(start.elapsed().as_secs_f64());
+        HTTP_REQUEST_PARSE_FAILURES.observe(elapsed);
         return req;
     }
 
@@ -60,7 +59,7 @@ pub async fn observe_request<R: Future<Output = Result<Request>>>(req: R) -> Res
 
     HTTP_REQUEST
         .with_label_values(common_labels.as_slice())
-        .observe(start.elapsed().as_secs_f64());
+        .observe(elapsed);
 
     HTTP_REQUEST_BODY
         .with_label_values(common_labels.as_slice())

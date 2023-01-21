@@ -3,6 +3,8 @@ use std::collections::{
     HashMap,
 };
 
+use lazy_static::lazy_static;
+
 /// Headers are key-value with multiple values. Adding a new header
 /// does not overwrite existing values, it only appends.
 #[derive(Debug, Default, Clone)]
@@ -38,13 +40,22 @@ impl Headers {
     }
 
     pub fn into_string(self) -> String {
-        // safe: don't render multiple headers for multiple values
-        // since we don't have / want to encode the list of headers
-        // where that's OK.
         self.0
             .into_iter()
             .fold(vec![], |mut acc: Vec<String>, (key, values)| {
-                acc.push(key + ": " + &values.as_slice().join(", "));
+                if values.len() == 0 {
+                    // ???
+                } else if values.len() > 1 {
+                    match KNOWN_LIST_HEADERS.get(key.to_lowercase().as_str()) {
+                        Some(delim) => {
+                            acc.push(format!("{}: {}", key, &values.as_slice().join(delim)))
+                        }
+                        None => acc.extend(values.iter().map(|v| format!("{}: {}", key, v))),
+                    }
+                } else {
+                    acc.push(format!("{}: {}", key, &values.first().unwrap()));
+                }
+
                 acc
             })
             .as_slice()
@@ -64,6 +75,36 @@ impl Headers {
     }
 }
 
+lazy_static! {
+    // Mapping of known multivalue headers in lowercase
+    // to their delimeter.
+    pub static ref KNOWN_LIST_HEADERS: HashMap<&'static str, &'static str> = [
+        ("a-im", ","),
+        ("accept", ","),
+        ("accept-charset", ","),
+        ("accept-encoding", ","),
+        ("accept-language", ","),
+        ("access-control-request-headers", ","),
+        ("cache-control", ","),
+        ("cookie", ";"),
+        ("connection", ","),
+        ("content-type", ";"),
+        ("content-encoding", ","),
+        ("expect", ","),
+        ("forwarded", ","),
+        ("if-match", ","),
+        ("if-none-match", ","),
+        ("prefer", ";"),
+        ("range", ","),
+        ("te", ","),
+        ("trailer", ","),
+        ("transfer-encoding", ","),
+        ("upgrade", ","),
+        ("via", ","),
+        ("warning", ","),
+    ].into_iter().collect::<HashMap<&'static str, &'static str>>();
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -72,18 +113,18 @@ mod test {
     fn test_serialize_headers() {
         let mut h = Headers::default();
         h.add("Connection", "Close")
-            .add("Set-Cookie", "session=123")
-            .add("Set-Cookie", "foo=bar");
+            .add("Cookie", "session=123")
+            .add("Cookie", "foo=bar");
 
         let mut count = 0;
         for l in h.into_string().lines() {
             count += 1;
             match l.split_once(": ") {
                 Some(("Connection", v)) => assert_eq!("Close", v),
-                Some(("Set-Cookie", values)) => {
+                Some(("Cookie", values)) => {
                     assert_eq!(
                         vec!["session=123", "foo=bar"],
-                        values.split(", ").collect::<Vec<&str>>()
+                        values.split(";").collect::<Vec<&str>>()
                     )
                 }
                 other => panic!("unexpected extra header: {:?}", other),

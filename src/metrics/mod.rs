@@ -2,13 +2,11 @@
 // https://romankudryashov.com/blog/2021/11/monitoring-rust-web-application/
 
 mod request;
-mod statics;
 
 pub use request::*;
-pub use statics::*;
 
 use std::net::SocketAddr;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use prometheus::TextEncoder;
 use tokio::{
@@ -20,7 +18,7 @@ use tokio::{
 
 use httpot::{
     http::{
-        request::{parse_request, Method, Request},
+        request::{parse_request, Method},
         response::{ResponseBuilder, StatusCode},
         stock_responses,
     },

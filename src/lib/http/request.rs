@@ -1,9 +1,11 @@
-use crate::http::headers::Headers;
 use std::net::SocketAddr;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use url::Url;
 
-use crate::prelude::*;
+use crate::{
+    http::headers::{self, Headers},
+    prelude::*,
+};
 
 #[derive(Debug, Clone)]
 pub struct Request {
@@ -78,11 +80,14 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
                         if name.to_lowercase() == "content-length" {
                             body_len = Some(val.parse::<usize>()?);
                         }
-
-                        let vals = val
-                            .split(",")
-                            .map(|s| s.trim().to_string())
-                            .collect::<Vec<_>>();
+                        let vals =
+                            match headers::KNOWN_LIST_HEADERS.get(name.to_lowercase().as_str()) {
+                                Some(delim) => val
+                                    .split(delim)
+                                    .map(|s| s.trim().to_string())
+                                    .collect::<Vec<_>>(),
+                                None => vec![val.to_string()],
+                            };
 
                         debug!("added headers: {} => {:?}", name, vals);
 
@@ -202,7 +207,6 @@ impl Method {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::str::FromStr;
     use tokio::io::BufReader;
     use url::Host;
 
@@ -213,7 +217,7 @@ Host: 127.0.0.1:8080
 User-Agent: curl/7.83.1
 Foo: Bar
 Biz: Baz
-Cookie: asdf=123, fghj=4567, session=someid
+Cookie: asdf=123; fghj=4567;session=someid
 Accept: */*
 
 "#;
