@@ -9,6 +9,10 @@ use crate::{
     prelude::*,
 };
 
+const MAX_BODY_SIZE: usize = 256 * 1024 + 1;
+const MAX_HEADER_VALUE_SIZE: usize = 1024 + 1;
+const MAX_HEADER_KEY_SIZE: usize = 256;
+
 #[derive(Debug, Clone)]
 pub struct Request {
     pub headers: Headers,
@@ -80,7 +84,14 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
                         let val = val.trim();
 
                         if name.to_lowercase() == "content-length" {
-                            body_len = Some(val.parse::<usize>()?);
+                            let size = val.parse::<usize>()?;
+                            ensure!(
+                                size < MAX_BODY_SIZE,
+                                "body len {} in excess of allowed size {}",
+                                size,
+                                MAX_BODY_SIZE
+                            );
+                            body_len = Some(size);
                         }
                         let vals =
                             match headers::KNOWN_LIST_HEADERS.get(name.to_lowercase().as_str()) {
@@ -91,6 +102,23 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
                                 None => vec![val.to_string()],
                             };
 
+                        ensure!(
+                            name.len() < MAX_HEADER_KEY_SIZE,
+                            "header len {} in excess of allowed size {}",
+                            name.len(),
+                            MAX_HEADER_KEY_SIZE,
+                        );
+                        let vals_len = vals
+                            .iter()
+                            .map(|v| v.len())
+                            .reduce(|l, r| l + r)
+                            .unwrap_or_default();
+                        ensure!(
+                            vals_len < MAX_HEADER_VALUE_SIZE,
+                            "header value len {} in excess of allowed len {}",
+                            vals_len,
+                            MAX_HEADER_VALUE_SIZE,
+                        );
                         debug!("added headers: {} => {:?}", name, vals);
 
                         headers
