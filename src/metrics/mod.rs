@@ -1,7 +1,10 @@
 // heavy inspiration from:
 // https://romankudryashov.com/blog/2021/11/monitoring-rust-web-application/
 
+mod request;
 mod statics;
+
+pub use request::*;
 pub use statics::*;
 
 use std::net::SocketAddr;
@@ -93,32 +96,4 @@ async fn four_hundred(w: &mut OwnedWriteHalf) -> Result<()> {
     let resp = stock_responses::generic_status(StatusCode::BadRequest).build()?;
     w.try_write(&resp.as_bytes()?)?;
     Ok(())
-}
-
-pub fn observe_request(req: &Request, start: Instant) {
-    let ip = req.remote_ip.ip().to_string();
-    let meth = req.method.to_string();
-
-    let common_labels: Vec<&str> = vec![
-        &meth,
-        &ip,
-        req.headers
-            .get("User-Agent")
-            .and_then(|s| s.first())
-            .map(|s| s.as_str())
-            .unwrap_or_else(|| "unknown"),
-        &req.version,
-    ];
-
-    HTTP_REQUEST
-        .with_label_values(common_labels.as_slice())
-        .observe(start.elapsed().as_secs_f64());
-
-    HTTP_REQUEST_BODY
-        .with_label_values(common_labels.as_slice())
-        .inc_by(req.size as f64);
-
-    HTTP_REQUEST_PATH_LENGTH
-        .with_label_values(common_labels.as_slice())
-        .inc_by(req.size as f64);
 }

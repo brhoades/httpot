@@ -3,6 +3,7 @@ mod router;
 mod runtime;
 
 use std::net::SocketAddr;
+use std::time::Instant;
 
 use log::LevelFilter;
 use pretty_env_logger::env_logger::Target;
@@ -87,9 +88,8 @@ async fn process_socket(s: TcpStream) -> Result<()> {
     debug!("get socket start...");
     r.get_ref().readable().await?;
 
-    let start = std::time::Instant::now();
-    let req = request::parse_request(&addr, &mut r).await?;
-    metrics::observe_request(&req, start);
+    let start = Instant::now();
+    let req = metrics::observe_request(request::parse_request(&addr, &mut r)).await?;
 
     info!(
         "{: <8} {: <20} ==> {: <8} {} bytes {}",
