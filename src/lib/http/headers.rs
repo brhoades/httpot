@@ -23,6 +23,17 @@ impl Headers {
         self.0.get(key)
     }
 
+    /// get_all returns a new vector of all headers in the provided keys
+    pub fn get_all<S: AsRef<str>>(&self, keys: &Vec<S>) -> Vec<&String> {
+        keys.iter()
+            .flat_map(|k| {
+                self.get(k.as_ref())
+                    .map(|v| v.iter().collect())
+                    .unwrap_or_else(|| vec![])
+            })
+            .collect()
+    }
+
     #[allow(dead_code)]
     pub fn get_mut(&mut self, key: &str) -> Option<&mut Vec<String>> {
         self.0.get_mut(key)

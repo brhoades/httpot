@@ -94,8 +94,9 @@ async fn process_socket(s: TcpStream) -> Result<()> {
         req.requester(),
         truncate(
             &req.headers
-                .get("User-Agent")
-                .and_then(|v| v.first())
+                .get_all(&vec!["User-Agent", "user-agent"])
+                .into_iter()
+                .next()
                 .cloned()
                 .unwrap_or_else(|| "Unknown".to_string()),
             20
