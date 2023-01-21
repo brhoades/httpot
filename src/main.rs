@@ -91,7 +91,7 @@ async fn process_socket(s: TcpStream) -> Result<()> {
 
     info!(
         "{: <8} {: <20} ==> {: <8} {} bytes {}",
-        addr,
+        req.requester(),
         truncate(
             &req.headers
                 .get("User-Agent")
@@ -111,7 +111,7 @@ async fn process_socket(s: TcpStream) -> Result<()> {
 
     info!(
         "{: <8} <== {: <4} {: >8} bytes",
-        addr,
+        req.requester(),
         resp.status_code().to_string(),
         resp.len(),
     );
