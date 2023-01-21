@@ -49,10 +49,11 @@ pub async fn observe_request<R: Future<Output = Result<Request>>>(req: R) -> Res
     let common_labels: Vec<&str> = vec![
         &meth,
         &ip,
-        req.headers
-            .get("User-Agent")
-            .and_then(|s| s.first())
-            .map(|s| s.as_str())
+        &req.headers
+            .get_all(&vec!["User-Agent", "user-agent"])
+            .into_iter()
+            .next()
+            .map(|v| v.as_str())
             .unwrap_or_else(|| "unknown"),
         &req.version,
     ];
