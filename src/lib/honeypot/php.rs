@@ -96,7 +96,7 @@ mod test {
 
         for c in pos_cases {
             assert!(
-                is_php_easter_egg_url(&Url::parse(c).unwrap()),
+                is_easter_egg_url(&Url::parse(c).unwrap()),
                 "failed to match url: {}",
                 c
             );
@@ -111,7 +111,7 @@ mod test {
 
         for c in neg_cases {
             assert!(
-                !is_php_easter_egg_url(&Url::parse(c).unwrap()),
+                !is_easter_egg_url(&Url::parse(c).unwrap()),
                 "failed to not match url: {}",
                 c
             );

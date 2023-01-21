@@ -202,6 +202,7 @@ impl Method {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::str::FromStr;
     use tokio::io::BufReader;
     use url::Host;
 
@@ -217,8 +218,9 @@ Accept: */*
 
 "#;
         let mut r = BufReader::new(input.as_bytes());
+        let peer = "127.0.0.1:8000".parse().unwrap();
 
-        let req = parse_request(&mut r).await.unwrap();
+        let req = parse_request(&peer, &mut r).await.unwrap();
 
         assert_eq!(Method::GET, req.method);
         assert_eq!("/", req.url.path());
@@ -255,8 +257,9 @@ User-Agent: HTTPie/3.2.1
 }
 "#;
         let mut r = BufReader::new(input.as_bytes());
+        let peer = "127.0.0.1:8000".parse().unwrap();
 
-        let req = parse_request(&mut r).await.unwrap();
+        let req = parse_request(&peer, &mut r).await.unwrap();
 
         assert_eq!(Method::POST, req.method);
         assert_eq!("/", req.url.path());
