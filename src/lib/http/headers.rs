@@ -102,6 +102,7 @@ lazy_static! {
         ("upgrade", ","),
         ("via", ","),
         ("warning", ","),
+        ("x-forwarded-for", ","),
     ].into_iter().collect::<HashMap<&'static str, &'static str>>();
 }
 

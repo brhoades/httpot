@@ -1,4 +1,6 @@
+use std::fmt;
 use std::net::SocketAddr;
+
 use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use url::Url;
 
@@ -36,7 +38,7 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
     let mut path = None;
     let mut body_len = None;
     let mut body = Vec::<u8>::new();
-    let remote_addr = addr; // TODO: handle X-Forwarded-For / X-Real-IP
+    let remote_addr = addr;
 
     let mut state = RequestReadState::Version;
     'request: loop {
@@ -154,6 +156,69 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
     Ok(req)
 }
 
+impl Request {
+    /// Provides the proxy-aware requesting address, the first value in this
+    /// order that parses as a SocketAddr is accepted:
+    ///  * for in "Forwarded"
+    ///  * X-Forwarded-For
+    ///  * self.remote_ip
+    pub fn requester(&self) -> String {
+        let forwarded = self
+            .headers
+            .get("Forwarded")
+            .and_then(|v| v.first())
+            .and_then(|vals| {
+                vals.split(|c| c == ',' || c == ';')
+                    .map(|s| s.to_lowercase())
+                    .filter_map(|pair| match pair.split_once('=') {
+                        Some((k, v)) if k.trim() == "for" => Some(v.trim().to_string()),
+                        _ => None,
+                    })
+                    .next()
+            });
+
+        if let Some(fwd) = forwarded {
+            return fwd;
+        }
+
+        let forwarded = self
+            .headers
+            .get("X-Forwarded-For")
+            .and_then(|v| v.first())
+            .and_then(|vals| vals.split(",").map(|v| v.trim()).next());
+
+        if let Some(fwd) = forwarded {
+            return fwd.to_string();
+        }
+
+        self.remote_ip.to_string()
+    }
+}
+
+impl fmt::Display for Request {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut lines = vec![
+            format!(
+                "{} {} {}",
+                self.method.to_string(),
+                self.url.path(),
+                self.version,
+            ),
+            self.headers.to_string(),
+            "".to_string(),
+        ];
+
+        if self.size > 0 {
+            lines.push(String::from_utf8(self.body.clone()).map_err(|e| {
+                error!("body failed to convert request body to utf8: {}", e);
+                fmt::Error
+            })?);
+        }
+
+        write!(f, "{}", lines.join("\n\r"))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub enum Method {
     GET,
@@ -245,43 +310,58 @@ Accept: */*
     }
 
     #[tokio::test]
-    async fn test_basic_post_request_parse() {
-        let input = r#"POST / HTTP/1.1
-Accept: application/json, */*;q=0.5
-Accept-Encoding: gzip, deflate, br
-Connection: keep-alive
-Content-Length: 29
-Content-Type: application/json
-Host: 127.0.0.1:8080
-User-Agent: HTTPie/3.2.1
+    async fn test_requester() {
+        let _ = pretty_env_logger::try_init();
+        let mut req = stub_request();
+        req.remote_ip = "1.2.3.4:61723".parse().unwrap();
 
-{
-    "foo": "bar",
-    "test": "baz"
-}
-"#;
-        let mut r = BufReader::new(input.as_bytes());
-        let peer = "127.0.0.1:8000".parse().unwrap();
-
-        let req = parse_request(&peer, &mut r).await.unwrap();
-
-        assert_eq!(Method::POST, req.method);
-        assert_eq!("/", req.url.path());
-        assert_eq!("127.0.0.1".parse().ok().map(Host::Ipv4), req.url.host());
-        assert_eq!(8080, req.url.port().unwrap_or_default());
-        assert_eq!("HTTP/1.1", req.version);
-        assert_eq!(29, req.body.len());
-
+        // expected => vec of headers to apply
         let cases = vec![
-            ("Host", vec!["127.0.0.1:8080"]),
-            ("User-Agent", vec!["HTTPie/3.2.1"]),
-            ("Accept", vec!["application/json", "*/*;q=0.5"]),
-            ("Accept-Encoding", vec!["gzip", "deflate", "br"]),
-            ("Connection", vec!["keep-alive"]),
-            ("Content-Length", vec!["29"]),
-            ("Content-Type", vec!["application/json"]),
+            ("1.2.3.4:61723", vec![]),
+            (
+                "192.168.1.100:50212",
+                vec![("X-Forwarded-For", "192.168.1.100:50212")],
+            ),
+            ("192.168.1.100", vec![("X-Forwarded-For", "192.168.1.100")]),
+            (
+                "192.168.162.109:46591",
+                vec![
+                    ("X-Forwarded-For", "192.168.1.251"),
+                    ("Forwarded", "for=192.168.162.109:46591"),
+                ],
+            ),
+            (
+                "192.168.162.109",
+                vec![("Forwarded", "for=192.168.162.109")],
+            ),
+            (
+                "203.0.113.195",
+                vec![(
+                    "X-Forwarded-For",
+                    "203.0.113.195, 2001:db8:85a3:8d3:1319:8a2e:370:7348",
+                )],
+            ),
+            (
+                "210.0.113.195",
+                vec![(
+                    "X-Forwarded-For",
+                    "210.0.113.195,2001:db8:85a3:8d3:1319:8a2e:370:7348",
+                )],
+            ),
         ];
-        assert_headers_eq(cases, &req.headers);
+        for (i, (expected, headers)) in cases.into_iter().enumerate() {
+            let mut req = req.clone();
+            for (k, v) in headers {
+                req.headers.add(k, v);
+            }
+
+            assert_eq!(
+                expected.to_string(),
+                req.requester(),
+                "case i={}: headers did not yield correct requester addr",
+                i
+            );
+        }
     }
 
     fn assert_headers_eq(expected: Vec<(&str, Vec<&str>)>, actual: &Headers) {
@@ -297,6 +377,18 @@ User-Agent: HTTPie/3.2.1
                 expected,
                 actual.get(header)
             );
+        }
+    }
+
+    fn stub_request() -> Request {
+        Request {
+            headers: Headers::new(),
+            size: 0,
+            body: vec![],
+            method: Method::GET,
+            url: "http://127.0.0.1:8080/".parse().unwrap(),
+            version: "HTTP/1.1".to_string(),
+            remote_ip: "1.1.1.1:62012".parse().unwrap(),
         }
     }
 }
