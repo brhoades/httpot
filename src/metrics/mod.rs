@@ -5,17 +5,19 @@ mod statics;
 pub use statics::*;
 
 use std::net::SocketAddr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use prometheus::TextEncoder;
-use tokio::io::BufReader;
-use tokio::net::tcp::OwnedWriteHalf;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::time::sleep;
+use tokio::{
+    io::BufReader,
+    net::tcp::OwnedWriteHalf,
+    net::{TcpListener, TcpStream},
+    time::sleep,
+};
 
 use httpot::{
     http::{
-        request::{parse_request, Method},
+        request::{parse_request, Method, Request},
         response::{ResponseBuilder, StatusCode},
         stock_responses,
     },
@@ -51,13 +53,13 @@ pub async fn run(addr: Option<SocketAddr>) -> Result<()> {
 }
 
 async fn process_req(s: TcpStream) -> Result<()> {
-    let addr = s.peer_addr()?.to_string();
+    let addr = s.peer_addr()?;
     let (r, mut w) = s.into_split();
     debug!("metrics conn from {}", addr);
 
     r.readable().await?;
 
-    let req = parse_request(&mut BufReader::new(r)).await?;
+    let req = parse_request(&addr, &mut BufReader::new(r)).await?;
     if req.url.path() != "/" || req.method != Method::GET {
         warn!(
             "from {} => only reqs to / are supported, got {} {}",
@@ -91,4 +93,32 @@ async fn four_hundred(w: &mut OwnedWriteHalf) -> Result<()> {
     let resp = stock_responses::generic_status(StatusCode::BadRequest).build()?;
     w.try_write(&resp.as_bytes()?)?;
     Ok(())
+}
+
+pub fn observe_request(req: &Request, start: Instant) {
+    let ip = req.remote_ip.ip().to_string();
+    let meth = req.method.to_string();
+
+    let common_labels: Vec<&str> = vec![
+        &meth,
+        &ip,
+        req.headers
+            .get("User-Agent")
+            .and_then(|s| s.first())
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| "unknown"),
+        &req.version,
+    ];
+
+    HTTP_REQUEST
+        .with_label_values(common_labels.as_slice())
+        .observe(start.elapsed().as_secs_f64());
+
+    HTTP_REQUEST_BODY
+        .with_label_values(common_labels.as_slice())
+        .inc_by(req.size as f64);
+
+    HTTP_REQUEST_PATH_LENGTH
+        .with_label_values(common_labels.as_slice())
+        .inc_by(req.size as f64);
 }

@@ -1,4 +1,5 @@
 use crate::http::headers::Headers;
+use std::net::SocketAddr;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use url::Url;
 
@@ -12,6 +13,7 @@ pub struct Request {
     pub method: Method,
     pub url: Url,
     pub version: String,
+    pub remote_ip: SocketAddr,
 }
 
 #[derive(Debug, Default)]
@@ -23,6 +25,7 @@ enum RequestReadState {
 }
 
 pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
+    addr: &SocketAddr,
     reader: &mut T,
 ) -> Result<Request> {
     let mut version = None;
@@ -31,6 +34,7 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
     let mut path = None;
     let mut body_len = None;
     let mut body = Vec::<u8>::new();
+    let remote_addr = addr; // TODO: handle X-Forwarded-For / X-Real-IP
 
     let mut state = RequestReadState::Version;
     'request: loop {
@@ -138,6 +142,7 @@ pub async fn parse_request<T: std::marker::Unpin + AsyncBufReadExt>(
         body,
         method: method.unwrap_or_default(),
         version: version.unwrap_or_default().trim().to_string(),
+        remote_ip: remote_addr.to_owned(),
     };
 
     debug!("done reading request. url: {}. req: {:?}", req.url, req);
@@ -189,7 +194,8 @@ impl Method {
             CONNECT => "CONNECT",
             OPTIONS => "OPTIONS",
             TRACE => "TRACE",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 

@@ -1,48 +1,23 @@
 use lazy_static::lazy_static;
-use prometheus::{
-    self, default_registry, register_histogram_vec, register_int_counter, Counter, Error,
-    HistogramVec, IntCounter, Opts,
-};
-
-use httpot::prelude::*;
+use prometheus::{self as prom, register_counter_vec, register_histogram_vec};
 
 lazy_static! {
-    pub static ref HIGH_FIVE_COUNTER: IntCounter =
-        register_int_counter!("http.request", "").unwrap();
-    pub static ref HTTP_REQUEST: HistogramVec = register_histogram_vec!(
-        "http.request",
+    pub static ref HTTP_REQUEST: prom::HistogramVec = register_histogram_vec!(
+        "http_request",
         "Incoming HTTP request read and parse time",
-        &[
-            "method",
-            "body_size",
-            "remote_ip",
-            "path",
-            "host",
-            "user_agent",
-            "version",
-        ]
+        &["method", "remote_ip", "user_agent", "version"]
+    )
+    .unwrap();
+    pub static ref HTTP_REQUEST_BODY: prom::CounterVec = register_counter_vec!(
+        "http_request_body_size",
+        "Incoming HTTP request cumulative body size",
+        &["method", "remote_ip", "user_agent", "version"]
+    )
+    .unwrap();
+    pub static ref HTTP_REQUEST_PATH_LENGTH: prom::CounterVec = register_counter_vec!(
+        "http_request_path_length",
+        "Incoming HTTP request cumulative request path length",
+        &["method", "remote_ip", "user_agent", "version"]
     )
     .unwrap();
 }
-
-pub fn count(name: &str, desc: &str) -> Result<()> {
-    let opts = Opts::new(name, desc);
-    let counter = Counter::with_opts(opts)?;
-
-    let r = default_registry();
-    match r.register(Box::new(counter.clone())) {
-        Ok(_) => (),
-        Err(Error::AlreadyReg) => (),
-        Err(e) => bail!("failed register metric: {}", e),
-    }
-    counter.inc();
-
-    Ok(())
-}
-
-/*
-#[macro_export]
-macro_rules! count {
-}
-
-*/

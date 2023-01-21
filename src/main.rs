@@ -79,15 +79,17 @@ async fn listen_loop(addr: SocketAddr) -> Result<()> {
 }
 
 async fn process_socket(s: TcpStream) -> Result<()> {
-    let addr = s.peer_addr()?.to_string();
-    metrics::count("conn_accept", "Incoming accepted TCP connections")?;
+    let addr = s.peer_addr()?;
 
     let (r, w) = s.into_split();
 
     let mut r = BufReader::new(r);
     debug!("get socket start...");
     r.get_ref().readable().await?;
-    let req = request::parse_request(&mut r).await?;
+
+    let start = std::time::Instant::now();
+    let req = request::parse_request(&addr, &mut r).await?;
+    metrics::observe_request(&req, start);
 
     info!(
         "{: <8} {: <20} ==> {: <8} {} bytes {}",
