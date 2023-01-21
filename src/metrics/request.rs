@@ -67,7 +67,7 @@ pub async fn observe_request<R: Future<Output = Result<Request>>>(req: R) -> Res
 
     HTTP_REQUEST_PATH_LENGTH
         .with_label_values(common_labels.as_slice())
-        .inc_by(req.size as f64);
+        .inc_by(req.url.path().len() as f64);
 
     Ok(req)
 }
