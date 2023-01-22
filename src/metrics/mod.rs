@@ -2,8 +2,10 @@
 // https://romankudryashov.com/blog/2021/11/monitoring-rust-web-application/
 
 mod request;
+mod response;
 
 pub use request::*;
+pub use response::*;
 
 use std::net::SocketAddr;
 use std::time::Duration;
