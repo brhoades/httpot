@@ -203,3 +203,49 @@ impl fmt::Display for StatusCode {
         write!(f, "{}", self.to_string())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn basic_utf8_body() {
+        let size = 1024 * 1024;
+        let mut body = Vec::<u8>::with_capacity(256 * 1024 * 1024);
+        body.resize(size, 'a' as u8);
+
+        let resp = ResponseBuilder::ok().body(body).build().unwrap();
+        let len: usize = resp
+            .headers
+            .get("Content-Length")
+            .and_then(|v| v.first())
+            .expect("content length header should be present")
+            .parse()
+            .unwrap();
+
+        assert_eq!(len, size);
+    }
+
+    // multibyte unicode should be counted appropriately;
+    #[tokio::test]
+    async fn expanded_utf8_body() {
+        use rand::{thread_rng, Rng};
+
+        let body: String = thread_rng()
+            .sample_iter::<char, _>(rand::distributions::Standard)
+            .take(2048)
+            .collect();
+        let size = body.len();
+
+        let resp = ResponseBuilder::ok().body(body).build().unwrap();
+        let len: usize = resp
+            .headers
+            .get("Content-Length")
+            .and_then(|v| v.first())
+            .unwrap()
+            .parse()
+            .unwrap();
+
+        assert_eq!(len, size);
+    }
+}
