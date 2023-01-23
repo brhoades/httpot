@@ -74,20 +74,19 @@ async fn process_req(s: TcpStream) -> Result<()> {
         return four_hundred(&mut w).await;
     }
 
-    let encoder = TextEncoder::new();
-    let mut buffer = String::new();
-    encoder
-        .encode_utf8(&prometheus::gather(), &mut buffer)
-        .expect("Failed to encode metrics");
+    w.writable().await?;
+
+    let resp = TextEncoder::new()
+        .encode_to_string(&prometheus::gather())
+        .map_err(|e| anyhow!("failed to convert metrics to string: {}", e))?;
 
     let resp = ResponseBuilder::ok()
         .add_header("Content-Type", "text/plain")
-        .body(buffer)
+        .body(resp)
         .build()?;
 
-    w.writable().await?;
     let res = w.try_write(&resp.as_bytes()?)?;
-    debug!("wrote {} metrics bytes", res);
+    info!("{}: wrote {} metrics bytes", addr, res);
 
     Ok(())
 }
