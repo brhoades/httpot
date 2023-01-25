@@ -1,10 +1,6 @@
 use lazy_static::lazy_static;
-use std::time::Instant;
 
 use prometheus::{self as prom, register_counter_vec, register_histogram_vec};
-use std::future::Future;
-
-use httpot::{http::response::Response, prelude::*};
 
 lazy_static! {
     pub static ref HTTP_RESPONSE: prom::HistogramVec = register_histogram_vec!(
