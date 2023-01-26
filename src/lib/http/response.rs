@@ -40,6 +40,7 @@ fn default_headers() -> Headers {
         ),
     );
     headers.add("Date", Utc::now().format("%a, %d %b %Y %H:%M:%S GMT"));
+    headers.add("Connection", "Close");
 
     headers
 }
