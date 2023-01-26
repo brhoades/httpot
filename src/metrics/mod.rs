@@ -124,7 +124,7 @@ async fn write_all(w: &mut OwnedWriteHalf, buf: &[u8]) -> Result<()> {
         match w.try_write(&buf[n..]) {
             Ok(remainder) if remainder + n < buf.len() => {
                 let new_n = n + remainder;
-                debug!(
+                trace!(
                     "wrote only {} of remaining {} in metrics response, will retry",
                     n,
                     buf.len() - new_n
@@ -132,7 +132,7 @@ async fn write_all(w: &mut OwnedWriteHalf, buf: &[u8]) -> Result<()> {
                 n = new_n;
             }
             Ok(remainder) => {
-                debug!(
+                trace!(
                     "done writing metrics response with remainder {} (n={}, buf.len={})",
                     remainder,
                     n,
