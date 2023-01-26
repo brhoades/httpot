@@ -1,13 +1,9 @@
+use std::sync::Arc;
+
+use tokio::net::TcpStream;
 use typed_html::{dom::DOMTree, html, text, types::Metadata};
 
-use crate::{
-    fs::fake,
-    http::{
-        request::Request,
-        response::{Response, ResponseBuilder, StatusCode},
-    },
-    prelude::*,
-};
+use crate::http::response::{Response, ResponseBuilder, StatusCode};
 
 #[macro_export]
 macro_rules! boilerplate {
@@ -29,39 +25,32 @@ macro_rules! boilerplate {
     };
 }
 
-pub fn hello_world() -> Response {
+pub fn hello_world(out: TcpStream) -> Response {
     let body: DOMTree<String> = boilerplate!("Hello World!", html!(<h1>"Hello, World!"</h1>));
 
-    ResponseBuilder::ok()
+    ResponseBuilder::ok(Arc::new(out))
         .add_header("Content-Type", "text/html")
         .body(body.to_string())
         .build()
         .unwrap()
 }
 
-pub fn not_found() -> Response {
+pub fn not_found(out: TcpStream) -> Response {
     let body: DOMTree<String> = boilerplate!("Not Found", html!(<h1>"Not Found"</h1>));
 
-    ResponseBuilder::not_found()
+    ResponseBuilder::not_found(Arc::new(out))
         .add_header("Content-Type", "text/html")
         .body(body.to_string())
         .build()
         .unwrap()
 }
-pub fn generic_status(status: StatusCode) -> ResponseBuilder {
+pub fn generic_status(out: TcpStream, status: StatusCode) -> ResponseBuilder {
     let stat_str = text!("{}", status.to_string());
     let body: DOMTree<String> = boilerplate!(stat_str, html!(<h1>{stat_str}</h1>));
 
-    let mut resp = ResponseBuilder::default();
+    let mut resp = ResponseBuilder::default(Arc::new(out));
     resp.add_header("Content-Type", "text/html")
         .body(body.to_string())
         .status_code(status);
     resp
-}
-
-const SEED: &str = "seedv1";
-
-pub fn fake_directory_tree(req: &Request) -> Result<Response> {
-    //
-    Ok(fake::gen_fake_listing(SEED, req.url.path()))
 }

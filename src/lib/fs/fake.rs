@@ -9,10 +9,7 @@ use rand::{
 };
 use typed_html::{dom::DOMTree, html, text, types::Metadata};
 
-use crate::{
-    http::response::{Response, ResponseBuilder},
-    prelude::*,
-};
+use crate::prelude::*;
 
 // hashes path and seed together
 fn hash_path_seed<T: Hash>(seed: T, path: &str) -> u64 {
@@ -41,7 +38,7 @@ fn gen_fake_nodes<T: Hash>(seed: T, path: &str) -> Vec<Node> {
         .collect()
 }
 
-pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> Response {
+pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> String {
     let nodes = gen_fake_nodes(seed, path);
     let basepath = if path == "" {
         "/".to_string()
@@ -86,13 +83,7 @@ pub fn gen_fake_listing<T: Hash>(seed: T, path: &str) -> Response {
         </html>
     );
 
-    let doc = doc.to_string();
-    ResponseBuilder::ok()
-        .add_header("Content-Type", "text/html")
-        .add_header("Content-Length", doc.len())
-        .body(doc)
-        .build()
-        .unwrap()
+    doc.to_string()
 }
 
 type Node = Either<File, Folder>;

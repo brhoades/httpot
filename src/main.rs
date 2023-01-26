@@ -78,16 +78,14 @@ async fn listen_loop(addr: SocketAddr) -> Result<()> {
     }
 }
 
-async fn process_socket(s: TcpStream) -> Result<()> {
+async fn process_socket(mut s: TcpStream) -> Result<()> {
     let addr = s.peer_addr()?;
 
-    let (r, w) = s.into_split();
-
-    let mut r = BufReader::new(r);
     debug!("get socket start...");
-    r.get_ref().readable().await?;
+    s.readable().await?;
 
-    let req = metrics::observe_request(request::parse_request(&addr, &mut r)).await?;
+    let req = metrics::observe_request(request::parse_request(&addr, &mut BufReader::new(&mut s)))
+        .await?;
 
     info!(
         "{: <8} {: <20} ==> {: <8} {} bytes {}",
@@ -106,9 +104,8 @@ async fn process_socket(s: TcpStream) -> Result<()> {
         truncate(req.url.path(), 20),
     );
 
-    let resp = router::router(&req).await?;
-
-    w.try_write(&resp.as_bytes()?)?;
+    let mut resp = router::router(s, &req)?;
+    resp.send().await?;
 
     info!(
         "{: <8} <== {: <4} {: >8} bytes",

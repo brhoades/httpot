@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use lazy_static::lazy_static;
 use regex::Regex;
+use tokio::net::TcpStream;
 use url::Url;
 
 use crate::{
@@ -45,14 +48,14 @@ fn is_easter_egg_url(url: &Url) -> bool {
 
 /// Returns a php easter egg response relevant to the requested easter egg.
 /// An error is returned if no known easter egg is requested.
-pub fn easter_egg(req: &Request) -> Result<Response> {
+pub fn easter_egg(out: TcpStream, req: &Request) -> Result<Response> {
     let (_, v) = req.url.query_pairs().find(|(k, v)| k == "" && RE.is_match(v)).ok_or_else(|| anyhow!("failed to find PHP easter egg queryparam in order to build easter egg response in url: {}", req.url))?;
 
     match v.as_ref() {
-        "PHPE9568F36-D428-11d2-A769-00AA001ACF42" => php_image_resp(),
-        "PHPE9568F34-D428-11d2-A769-00AA001ACF42" => php_image_resp(),
-        "PHPE9568F35-D428-11d2-A769-00AA001ACF42" => php_image_resp(),
-        "PHPB8B5F2A0-3C92-11d3-A3A9-4C7B08C10000" => php_credits(),
+        "PHPE9568F36-D428-11d2-A769-00AA001ACF42" => php_image_resp(out),
+        "PHPE9568F34-D428-11d2-A769-00AA001ACF42" => php_image_resp(out),
+        "PHPE9568F35-D428-11d2-A769-00AA001ACF42" => php_image_resp(out),
+        "PHPB8B5F2A0-3C92-11d3-A3A9-4C7B08C10000" => php_credits(out),
         v => bail!(
             "unknown php easter egg querystring '{}' in url '{}'",
             v,
@@ -63,8 +66,8 @@ pub fn easter_egg(req: &Request) -> Result<Response> {
 
 // the image responses are different, but I doubt scrapers are sniffing for content length or rendering
 // them
-fn php_image_resp() -> Result<Response> {
-    Ok(ResponseBuilder::ok()
+fn php_image_resp(out: TcpStream) -> Result<Response> {
+    Ok(ResponseBuilder::ok(Arc::new(out))
         .body((0..2985).map(|_| 'a' as u8).collect::<Vec<u8>>())
         .add_header("Content-Type", "image/gif")
         .add_header("X-Powered-By", "PHP/4.0.1")
@@ -72,8 +75,8 @@ fn php_image_resp() -> Result<Response> {
 }
 
 // php 4.4.0 credits html though pretending to be an earlier version
-fn php_credits() -> Result<Response> {
-    Ok(ResponseBuilder::ok()
+fn php_credits(out: TcpStream) -> Result<Response> {
+    Ok(ResponseBuilder::ok(Arc::new(out))
         .body(include_str!("php_credits.html"))
         .add_header("Content-Type", "text/html")
         .add_header("X-Powered-By", "PHP/4.0.1")

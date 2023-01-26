@@ -8,12 +8,10 @@ pub use request::*;
 pub use response::*;
 
 use std::time::Duration;
-use std::{io, net::SocketAddr};
 
 use prometheus::TextEncoder;
 use tokio::{
     io::BufReader,
-    net::tcp::OwnedWriteHalf,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -29,7 +27,7 @@ use httpot::{
 
 /// self-disables and sleeps indefintiely on None. Otherwise listens
 /// for incoming requests and returns prometheus metrics.
-pub async fn run(addr: Option<SocketAddr>) -> Result<()> {
+pub async fn run(addr: Option<std::net::SocketAddr>) -> Result<()> {
     if addr.is_none() {
         sleep(Duration::MAX).await;
     }
@@ -55,14 +53,13 @@ pub async fn run(addr: Option<SocketAddr>) -> Result<()> {
     }
 }
 
-async fn process_req(s: TcpStream) -> Result<()> {
+async fn process_req(mut s: TcpStream) -> Result<()> {
     let addr = s.peer_addr()?;
-    let (r, mut w) = s.into_split();
     debug!("metrics conn from {}", addr);
 
-    r.readable().await?;
+    s.readable().await?;
 
-    let req = parse_request(&addr, &mut BufReader::new(r)).await?;
+    let req = parse_request(&addr, &mut BufReader::new(&mut s)).await?;
     if (req.url.path() != "/" && req.url.path() != "/metrics") || req.method != Method::GET {
         warn!(
             "from {} => only reqs to / and /metrics are supported, got {} {}",
@@ -71,26 +68,25 @@ async fn process_req(s: TcpStream) -> Result<()> {
             req.url
         );
 
-        return four_hundred(&mut w).await;
+        return four_hundred(s).await;
     }
 
-    w.writable().await?;
+    s.writable().await?;
 
     let resp = TextEncoder::new()
         .encode_to_string(&prometheus::gather())
         .map_err(|e| anyhow!("failed to convert metrics to string: {}", e))?;
 
-    let resp = ResponseBuilder::ok()
+    let mut resp = ResponseBuilder::ok(std::sync::Arc::new(s))
         .add_header("Content-Type", "text/plain")
         .body(resp)
         .build()?;
-    let resp_body = &resp.as_bytes()?;
 
     tokio::select!(
         _ = sleep(Duration::from_secs(5)) => {
             bail!("metrics response write timed out after 5 seconds");
         },
-        res = write_all(&mut w, &resp_body) => {
+        res = resp.send() => {
             match res {
                 Ok(_) => info!("{}: wrote {} metrics bytes", addr, resp.len()),
                 Err(e) => {
@@ -103,55 +99,9 @@ async fn process_req(s: TcpStream) -> Result<()> {
     Ok(())
 }
 
-async fn four_hundred(w: &mut OwnedWriteHalf) -> Result<()> {
-    let resp = stock_responses::generic_status(StatusCode::BadRequest).build()?;
-    w.try_write(&resp.as_bytes()?)?;
-    Ok(())
-}
-
-/// try to write all of the provided buffer repeatedly, waiting
-/// for the read side to be ready after each attempt.
-///
-/// write_all will indefinitely loop until the connection is closed or the
-/// entire response is written. Callers should time out after an unreasonable
-/// amount of time.
-async fn write_all(w: &mut OwnedWriteHalf, buf: &[u8]) -> Result<()> {
-    let mut n = 0;
-    loop {
-        w.writable()
-            .await
-            .map_err(|e| anyhow!("write half failed to be writeable in write loop: {}", e))?;
-        match w.try_write(&buf[n..]) {
-            Ok(remainder) if remainder + n < buf.len() => {
-                let new_n = n + remainder;
-                trace!(
-                    "wrote only {} of remaining {} in metrics response, will retry",
-                    n,
-                    buf.len() - new_n
-                );
-                n = new_n;
-            }
-            Ok(remainder) => {
-                trace!(
-                    "done writing metrics response with remainder {} (n={}, buf.len={})",
-                    remainder,
-                    n,
-                    buf.len()
-                );
-                break;
-            }
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                trace!("metrics response would block by writing, waiting");
-            }
-            Err(e) => bail!(
-                "failed to write remaining buf remainder={}, n={}, buf.len()={}: {}",
-                buf.len() - n,
-                n,
-                buf.len(),
-                e
-            ),
-        }
-    }
-
-    Ok(())
+async fn four_hundred(w: TcpStream) -> Result<()> {
+    stock_responses::generic_status(w, StatusCode::BadRequest)
+        .build()?
+        .send()
+        .await
 }
